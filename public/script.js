@@ -1,15 +1,17 @@
 /**
- * Alexa AI Receptionist Chatbot
- * Frontend JavaScript implementation with speech synthesis
+ * RexBot AI Character
+ * Frontend JavaScript implementation with speech input and character-based responses
  */
 
-class ReceptionistChatbot {
+class RexBotCharacter {
     constructor() {
         this.conversationId = this.generateConversationId();
         this.speechEnabled = true;
         this.speechSynthesis = window.speechSynthesis;
+        this.speechRecognition = null;
         this.currentUtterance = null;
         this.isProcessing = false;
+        this.isListening = false;
         
         this.initializeElements();
         this.setupEventListeners();
@@ -22,9 +24,9 @@ class ReceptionistChatbot {
      * Initialize DOM elements
      */
     initializeElements() {
-        this.chatForm = document.getElementById('chatForm');
-        this.messageInput = document.getElementById('messageInput');
-        this.sendButton = document.getElementById('sendButton');
+        this.speechInputButton = document.getElementById('speechInputButton');
+        this.micIcon = document.getElementById('micIcon');
+        this.speechStatusDisplay = document.getElementById('speechStatusDisplay');
         this.chatMessages = document.getElementById('chatMessages');
         this.speechToggle = document.getElementById('speechToggle');
         this.speechIcon = document.getElementById('speechIcon');
@@ -42,11 +44,11 @@ class ReceptionistChatbot {
      * Set up event listeners
      */
     setupEventListeners() {
-        // Form submission
-        this.chatForm.addEventListener('submit', (e) => this.handleSubmit(e));
+        // Speech input button
+        this.speechInputButton.addEventListener('click', () => this.toggleSpeechInput());
         
-        // Speech toggle
-        this.speechToggle.addEventListener('click', () => this.toggleSpeech());
+        // Speech output toggle
+        this.speechToggle.addEventListener('click', () => this.toggleSpeechOutput());
         
         // Modal controls
         this.modalClose.addEventListener('click', () => this.hideErrorModal());
@@ -54,9 +56,6 @@ class ReceptionistChatbot {
         
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
-        
-        // Input validation
-        this.messageInput.addEventListener('input', () => this.validateInput());
         
         // Click outside modal to close
         this.errorModal.addEventListener('click', (e) => {
@@ -67,9 +66,10 @@ class ReceptionistChatbot {
     }
 
     /**
-     * Initialize speech synthesis
+     * Initialize speech synthesis and recognition
      */
     initializeSpeech() {
+        // Initialize speech synthesis
         if (!this.speechSynthesis) {
             console.warn('Speech synthesis not supported');
             this.speechEnabled = false;
@@ -88,50 +88,93 @@ class ReceptionistChatbot {
         };
 
         this.setupVoice();
+
+        // Initialize speech recognition
+        this.initializeSpeechRecognition();
     }
 
     /**
-     * Set up the voice for speech synthesis
+     * Initialize speech recognition
      */
-    setupVoice() {
-        const voices = this.speechSynthesis.getVoices();
+    initializeSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
-        // Try to find a female voice that sounds professional
-        let preferredVoice = voices.find(voice => 
-            voice.lang.startsWith('en') && 
-            (voice.name.includes('Female') || voice.name.includes('Samantha') || voice.name.includes('Alex'))
-        );
-        
-        if (!preferredVoice) {
-            preferredVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+        if (!SpeechRecognition) {
+            console.warn('Speech recognition not supported');
+            this.speechStatusDisplay.textContent = 'Speech recognition not supported';
+            return;
         }
-        
-        if (preferredVoice) {
-            console.log('Using voice:', preferredVoice.name);
+
+        this.speechRecognition = new SpeechRecognition();
+        this.speechRecognition.continuous = false;
+        this.speechRecognition.interimResults = false;
+        this.speechRecognition.lang = 'en-US';
+
+        this.speechRecognition.onstart = () => {
+            this.isListening = true;
+            this.updateSpeechInputUI('listening');
+            this.updateStatus('Listening...');
+        };
+
+        this.speechRecognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            this.handleSpeechInput(transcript);
+        };
+
+        this.speechRecognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            this.updateSpeechInputUI('error');
+            this.updateStatus('Error');
+            
+            if (event.error === 'no-speech') {
+                this.speechStatusDisplay.textContent = 'No speech detected. Try again!';
+            } else {
+                this.speechStatusDisplay.textContent = 'Speech recognition error. Try again!';
+            }
+            
+            setTimeout(() => {
+                this.updateSpeechInputUI('idle');
+                this.updateStatus('Ready');
+            }, 2000);
+        };
+
+        this.speechRecognition.onend = () => {
+            this.isListening = false;
+            this.updateSpeechInputUI('idle');
+            this.updateStatus('Ready');
+        };
+    }
+
+    /**
+     * Toggle speech input
+     */
+    toggleSpeechInput() {
+        if (this.isProcessing) return;
+
+        if (this.isListening) {
+            this.speechRecognition.stop();
+        } else {
+            this.speechRecognition.start();
         }
     }
 
     /**
-     * Handle form submission
+     * Handle speech input
      */
-    async handleSubmit(e) {
-        e.preventDefault();
-        
-        const message = this.messageInput.value.trim();
-        if (!message || this.isProcessing) return;
-        
+    async handleSpeechInput(transcript) {
+        if (!transcript.trim()) return;
+
         // Add user message to chat
-        this.addMessage(message, 'user');
-        this.messageInput.value = '';
-        this.validateInput();
+        this.addMessage(transcript, 'user');
         
-        // Show loading state
+        // Show processing state
         this.setLoading(true);
         this.updateStatus('Processing...');
+        this.updateSpeechInputUI('processing');
         
         try {
             // Send message to API
-            const response = await this.sendMessage(message);
+            const response = await this.sendMessage(transcript);
             
             // Add bot response to chat
             this.addMessage(response, 'bot');
@@ -148,6 +191,7 @@ class ReceptionistChatbot {
             this.updateStatus('Error');
         } finally {
             this.setLoading(false);
+            this.updateSpeechInputUI('idle');
         }
     }
 
@@ -230,16 +274,16 @@ class ReceptionistChatbot {
         
         const utterance = new SpeechSynthesisUtterance(text);
         
-        // Configure voice settings for Alexa-like experience
+        // Configure voice settings for RexBot character
         utterance.rate = 0.9; // Slightly slower than default
-        utterance.pitch = 1.1; // Slightly higher pitch
+        utterance.pitch = 1.2; // Slightly higher pitch for robot-like voice
         utterance.volume = 0.9; // High volume
         
         // Get available voices
         const voices = this.speechSynthesis.getVoices();
         let preferredVoice = voices.find(voice => 
             voice.lang.startsWith('en') && 
-            (voice.name.includes('Female') || voice.name.includes('Samantha') || voice.name.includes('Alex'))
+            (voice.name.includes('Male') || voice.name.includes('David') || voice.name.includes('James'))
         );
         
         if (preferredVoice) {
@@ -271,7 +315,7 @@ class ReceptionistChatbot {
     /**
      * Toggle speech synthesis on/off
      */
-    toggleSpeech() {
+    toggleSpeechOutput() {
         this.speechEnabled = !this.speechEnabled;
         this.updateSpeechUI();
         
@@ -282,17 +326,74 @@ class ReceptionistChatbot {
     }
 
     /**
-     * Update speech UI elements
+     * Update speech input UI
+     */
+    updateSpeechInputUI(state) {
+        const button = this.speechInputButton;
+        const icon = this.micIcon;
+        const status = this.speechStatusDisplay;
+        
+        // Remove all state classes
+        button.classList.remove('listening', 'processing');
+        status.classList.remove('listening', 'processing');
+        
+        switch (state) {
+            case 'listening':
+                button.classList.add('listening');
+                status.classList.add('listening');
+                icon.className = 'fas fa-stop';
+                status.textContent = 'Listening... Speak now!';
+                break;
+            case 'processing':
+                button.classList.add('processing');
+                status.classList.add('processing');
+                icon.className = 'fas fa-spinner fa-spin';
+                status.textContent = 'Processing your message...';
+                break;
+            case 'error':
+                icon.className = 'fas fa-exclamation-triangle';
+                status.textContent = 'Error occurred. Try again!';
+                break;
+            default: // idle
+                icon.className = 'fas fa-microphone';
+                status.textContent = 'Click the microphone to speak';
+                break;
+        }
+    }
+
+    /**
+     * Update speech output UI elements
      */
     updateSpeechUI(isSpeaking = false) {
         if (this.speechEnabled) {
             this.speechIcon.className = isSpeaking ? 'fas fa-volume-mute' : 'fas fa-volume-up';
-            this.speechStatus.textContent = isSpeaking ? 'Speaking...' : 'Speech enabled';
+            this.speechStatus.textContent = isSpeaking ? 'RexBot speaking...' : 'RexBot voice enabled';
             this.speechToggle.classList.toggle('active', isSpeaking);
         } else {
             this.speechIcon.className = 'fas fa-volume-mute';
-            this.speechStatus.textContent = 'Speech disabled';
+            this.speechStatus.textContent = 'RexBot voice disabled';
             this.speechToggle.classList.remove('active');
+        }
+    }
+
+    /**
+     * Set up the voice for speech synthesis
+     */
+    setupVoice() {
+        const voices = this.speechSynthesis.getVoices();
+        
+        // Try to find a male voice that sounds robotic
+        let preferredVoice = voices.find(voice => 
+            voice.lang.startsWith('en') && 
+            (voice.name.includes('Male') || voice.name.includes('David') || voice.name.includes('James'))
+        );
+        
+        if (!preferredVoice) {
+            preferredVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+        }
+        
+        if (preferredVoice) {
+            console.log('Using voice:', preferredVoice.name);
         }
     }
 
@@ -300,10 +401,10 @@ class ReceptionistChatbot {
      * Handle keyboard shortcuts
      */
     handleKeyboard(e) {
-        // Ctrl/Cmd + Enter to send message
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        // Spacebar to toggle speech input
+        if (e.code === 'Space' && !this.isProcessing) {
             e.preventDefault();
-            this.chatForm.dispatchEvent(new Event('submit'));
+            this.toggleSpeechInput();
         }
         
         // Escape to close modal
@@ -313,25 +414,12 @@ class ReceptionistChatbot {
     }
 
     /**
-     * Validate input field
-     */
-    validateInput() {
-        const message = this.messageInput.value.trim();
-        const isValid = message.length > 0 && !this.isProcessing;
-        
-        this.sendButton.disabled = !isValid;
-        this.messageInput.setAttribute('aria-invalid', !isValid);
-    }
-
-    /**
      * Set loading state
      */
     setLoading(loading) {
         this.isProcessing = loading;
         this.loadingOverlay.classList.toggle('show', loading);
-        this.sendButton.disabled = loading;
-        this.messageInput.disabled = loading;
-        this.validateInput();
+        this.speechInputButton.disabled = loading;
     }
 
     /**
@@ -345,6 +433,9 @@ class ReceptionistChatbot {
         switch (status.toLowerCase()) {
             case 'ready':
                 this.statusDot.style.background = '#10b981';
+                break;
+            case 'listening...':
+                this.statusDot.style.background = '#ef4444';
                 break;
             case 'processing...':
                 this.statusDot.style.background = '#f59e0b';
@@ -408,17 +499,17 @@ class ReceptionistChatbot {
     }
 }
 
-// Initialize chatbot when DOM is loaded
+// Initialize RexBot when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     try {
-        window.chatbot = new ReceptionistChatbot();
-        console.log('🚀 Alexa AI Receptionist initialized successfully');
+        window.rexbot = new RexBotCharacter();
+        console.log('🚀 RexBot AI Character initialized successfully');
     } catch (error) {
-        console.error('Failed to initialize chatbot:', error);
+        console.error('Failed to initialize RexBot:', error);
         // Show error to user
         setTimeout(() => {
-            if (window.chatbot) {
-                window.chatbot.showError('Failed to initialize chatbot. Please refresh the page.');
+            if (window.rexbot) {
+                window.rexbot.showError('Failed to initialize RexBot. Please refresh the page.');
             }
         }, 1000);
     }
@@ -426,16 +517,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Handle page visibility changes to pause speech when tab is hidden
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden && window.chatbot && window.chatbot.speechSynthesis) {
-        window.chatbot.speechSynthesis.pause();
-    } else if (!document.hidden && window.chatbot && window.chatbot.speechSynthesis) {
-        window.chatbot.speechSynthesis.resume();
+    if (document.hidden && window.rexbot && window.rexbot.speechSynthesis) {
+        window.rexbot.speechSynthesis.pause();
+    } else if (!document.hidden && window.rexbot && window.rexbot.speechSynthesis) {
+        window.rexbot.speechSynthesis.resume();
     }
 });
 
 // Handle beforeunload to clean up speech synthesis
 window.addEventListener('beforeunload', () => {
-    if (window.chatbot && window.chatbot.speechSynthesis) {
-        window.chatbot.speechSynthesis.cancel();
+    if (window.rexbot && window.rexbot.speechSynthesis) {
+        window.rexbot.speechSynthesis.cancel();
     }
 });

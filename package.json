@@ -1,7 +1,7 @@
 {
-  "name": "receptionist-chatbot",
+  "name": "rexbot-ai-character",
   "version": "1.0.0",
-  "description": "A web-based chatbot that acts as a receptionist with speech synthesis",
+  "description": "A web-based AI character named RexBot with speech input and character-based responses",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,12 +11,12 @@
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "openai": "^4.20.1"
+    "axios": "^1.4.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-  "keywords": ["chatbot", "receptionist", "speech-synthesis", "ai"],
+  "keywords": ["ai-character", "rexbot", "speech-input", "speech-synthesis", "chatbot"],
   "author": "Your Name",
   "license": "MIT"
 }

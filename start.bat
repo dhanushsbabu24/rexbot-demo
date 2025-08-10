@@ -1,41 +1,38 @@
 @echo off
 echo ========================================
-echo    Alexa AI Receptionist Chatbot
+echo   Alexa AI Receptionist Chatbot
 echo ========================================
 echo.
-echo Starting the chatbot server...
-echo.
-echo Make sure you have:
-echo 1. Node.js installed
-echo 2. Dependencies installed (npm install)
-echo 3. .env file configured with OpenAI API key
-echo.
-echo ========================================
+echo Starting the server...
 echo.
 
-REM Check if node_modules exists
+REM Check if Node.js is installed
+node --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ERROR: Node.js is not installed or not in PATH
+    echo Please install Node.js from https://nodejs.org/
+    pause
+    exit /b 1
+)
+
+REM Check if dependencies are installed
 if not exist "node_modules" (
     echo Installing dependencies...
     npm install
-    if errorlevel 1 (
-        echo Failed to install dependencies!
+    if %errorlevel% neq 0 (
+        echo ERROR: Failed to install dependencies
         pause
         exit /b 1
     )
-    echo.
 )
 
-REM Check if .env exists
+REM Create .env file if it doesn't exist
 if not exist ".env" (
-    echo Warning: .env file not found!
-    echo Please copy env.example to .env and add your OpenAI API key
-    echo.
-    pause
+    echo Creating .env file from template...
+    copy env.example .env >nul
 )
 
 echo Starting server on http://localhost:3000
 echo Press Ctrl+C to stop the server
 echo.
 npm start
-
-pause
