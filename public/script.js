@@ -1,226 +1,198 @@
 /**
- * RexBot AI Character
- * Frontend JavaScript implementation with speech input and character-based responses
+ * Enhanced RexBot AI Character - Main Script
  */
 
-class RexBotCharacter {
+class RexBot {
     constructor() {
         this.conversationId = this.generateConversationId();
-        this.speechEnabled = true;
-        this.speechSynthesis = window.speechSynthesis;
         this.speechRecognition = null;
-        this.currentUtterance = null;
-        this.isProcessing = false;
+        this.speechSynthesis = window.speechSynthesis;
         this.isListening = false;
+        this.isSpeechEnabled = true;
+        this.isTyping = false;
         
         this.initializeElements();
+        this.initializeSpeechRecognition();
         this.setupEventListeners();
-        this.initializeSpeech();
         this.setWelcomeTime();
-        this.updateStatus('Ready');
+        this.setupKeyboardShortcuts();
     }
 
-    /**
-     * Initialize DOM elements
-     */
     initializeElements() {
+        // Chat elements
+        this.chatMessages = document.getElementById('chatMessages');
         this.speechInputButton = document.getElementById('speechInputButton');
         this.micIcon = document.getElementById('micIcon');
         this.speechStatusDisplay = document.getElementById('speechStatusDisplay');
-        this.chatMessages = document.getElementById('chatMessages');
         this.speechToggle = document.getElementById('speechToggle');
         this.speechIcon = document.getElementById('speechIcon');
         this.speechStatus = document.getElementById('speechStatus');
-        this.loadingOverlay = document.getElementById('loadingOverlay');
         this.statusDot = document.getElementById('statusDot');
         this.statusText = document.getElementById('statusText');
+        
+        // Error handling
         this.errorModal = document.getElementById('errorModal');
+        this.errorTitle = document.getElementById('errorTitle');
         this.errorMessage = document.getElementById('errorMessage');
-        this.modalClose = document.getElementById('modalClose');
-        this.modalOk = document.getElementById('modalOk');
+        this.closeError = document.getElementById('closeError');
     }
 
-    /**
-     * Set up event listeners
-     */
+    initializeSpeechRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            this.speechRecognition = new SpeechRecognition();
+            
+            this.speechRecognition.continuous = false;
+            this.speechRecognition.interimResults = false;
+            this.speechRecognition.lang = 'en-US';
+            
+            this.speechRecognition.onstart = () => {
+                this.isListening = true;
+                this.speechInputButton.classList.add('recording');
+                this.micIcon.className = 'fas fa-stop';
+                this.speechStatusDisplay.textContent = 'Listening...';
+                this.speechStatusDisplay.classList.add('listening');
+                this.updateStatus('Listening...', 'listening');
+            };
+            
+            this.speechRecognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                this.speechStatusDisplay.textContent = `Heard: "${transcript}"`;
+                this.sendMessage(transcript);
+            };
+            
+            this.speechRecognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                this.showError(`Speech recognition error: ${event.error}`);
+                this.resetSpeechInput();
+            };
+            
+            this.speechRecognition.onend = () => {
+                this.resetSpeechInput();
+            };
+        } else {
+            console.warn('Speech recognition not supported');
+            this.speechInputButton.style.display = 'none';
+            this.showError('Speech recognition is not supported in your browser. Please use a modern browser like Chrome or Edge.');
+        }
+    }
+
     setupEventListeners() {
         // Speech input button
-        this.speechInputButton.addEventListener('click', () => this.toggleSpeechInput());
-        
-        // Speech output toggle
-        this.speechToggle.addEventListener('click', () => this.toggleSpeechOutput());
-        
-        // Modal controls
-        this.modalClose.addEventListener('click', () => this.hideErrorModal());
-        this.modalOk.addEventListener('click', () => this.hideErrorModal());
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
-        
-        // Click outside modal to close
-        this.errorModal.addEventListener('click', (e) => {
-            if (e.target === this.errorModal) {
-                this.hideErrorModal();
+        this.speechInputButton.addEventListener('click', () => {
+            if (this.isListening) {
+                this.speechRecognition.stop();
+            } else {
+                this.startSpeechRecognition();
+            }
+        });
+
+        // Speech toggle
+        this.speechToggle.addEventListener('click', () => {
+            this.toggleSpeech();
+        });
+
+        // Error modal
+        if (this.closeError) {
+            this.closeError.addEventListener('click', () => {
+                this.closeErrorModal();
+            });
+        }
+
+        // Close error modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeErrorModal();
             }
         });
     }
 
-    /**
-     * Initialize speech synthesis and recognition
-     */
-    initializeSpeech() {
-        // Initialize speech synthesis
-        if (!this.speechSynthesis) {
-            console.warn('Speech synthesis not supported');
-            this.speechEnabled = false;
-            this.updateSpeechUI();
-            return;
-        }
-
-        // Wait for voices to load
-        this.speechSynthesis.onvoiceschanged = () => {
-            this.setupVoice();
-        };
-
-        // Handle speech end
-        this.speechSynthesis.onend = () => {
-            this.currentUtterance = null;
-        };
-
-        this.setupVoice();
-
-        // Initialize speech recognition
-        this.initializeSpeechRecognition();
-    }
-
-    /**
-     * Initialize speech recognition
-     */
-    initializeSpeechRecognition() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
-        if (!SpeechRecognition) {
-            console.warn('Speech recognition not supported');
-            this.speechStatusDisplay.textContent = 'Speech recognition not supported';
-            return;
-        }
-
-        this.speechRecognition = new SpeechRecognition();
-        this.speechRecognition.continuous = false;
-        this.speechRecognition.interimResults = false;
-        this.speechRecognition.lang = 'en-US';
-
-        this.speechRecognition.onstart = () => {
-            this.isListening = true;
-            this.updateSpeechInputUI('listening');
-            this.updateStatus('Listening...');
-        };
-
-        this.speechRecognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            this.handleSpeechInput(transcript);
-        };
-
-        this.speechRecognition.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
-            this.updateSpeechInputUI('error');
-            this.updateStatus('Error');
-            
-            if (event.error === 'no-speech') {
-                this.speechStatusDisplay.textContent = 'No speech detected. Try again!';
-            } else {
-                this.speechStatusDisplay.textContent = 'Speech recognition error. Try again!';
+    setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // Spacebar to toggle speech input
+            if (e.code === 'Space' && !e.target.matches('input, textarea')) {
+                e.preventDefault();
+                if (this.speechRecognition) {
+                    if (this.isListening) {
+                        this.speechRecognition.stop();
+                    } else {
+                        this.startSpeechRecognition();
+                    }
+                }
             }
-            
-            setTimeout(() => {
-                this.updateSpeechInputUI('idle');
-                this.updateStatus('Ready');
-            }, 2000);
-        };
-
-        this.speechRecognition.onend = () => {
-            this.isListening = false;
-            this.updateSpeechInputUI('idle');
-            this.updateStatus('Ready');
-        };
+        });
     }
 
-    /**
-     * Toggle speech input
-     */
-    toggleSpeechInput() {
-        if (this.isProcessing) return;
-
-        if (this.isListening) {
-            this.speechRecognition.stop();
-        } else {
+    startSpeechRecognition() {
+        if (this.speechRecognition) {
             this.speechRecognition.start();
         }
     }
 
-    /**
-     * Handle speech input
-     */
-    async handleSpeechInput(transcript) {
-        if (!transcript.trim()) return;
+    resetSpeechInput() {
+        this.isListening = false;
+        this.speechInputButton.classList.remove('recording');
+        this.micIcon.className = 'fas fa-microphone';
+        this.speechStatusDisplay.textContent = 'Click the microphone to speak';
+        this.speechStatusDisplay.classList.remove('listening');
+        this.updateStatus('Ready', 'ready');
+    }
 
-        // Add user message to chat
-        this.addMessage(transcript, 'user');
+    async sendMessage(message) {
+        if (!message.trim()) return;
         
-        // Show processing state
-        this.setLoading(true);
-        this.updateStatus('Processing...');
-        this.updateSpeechInputUI('processing');
+        // Add user message to chat
+        this.addMessage(message, 'user');
+        
+        // Show typing indicator
+        this.showTypingIndicator();
+        
+        // Update status
+        this.updateStatus('Processing...', 'processing');
         
         try {
-            // Send message to API
-            const response = await this.sendMessage(transcript);
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    conversationId: this.conversationId
+                })
+            });
             
-            // Add bot response to chat
-            this.addMessage(response, 'bot');
-            
-            // Speak the response if speech is enabled
-            if (this.speechEnabled) {
-                this.speak(response);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            this.updateStatus('Ready');
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // Hide typing indicator
+            this.hideTypingIndicator();
+            
+            // Add bot response to chat
+            this.addMessage(data.response, 'bot');
+            
+            // Speak the response if enabled
+            if (this.isSpeechEnabled) {
+                this.speak(data.response);
+            }
+            
+            this.updateStatus('Ready', 'ready');
+            
         } catch (error) {
             console.error('Error sending message:', error);
+            this.hideTypingIndicator();
             this.showError('Failed to send message. Please try again.');
-            this.updateStatus('Error');
-        } finally {
-            this.setLoading(false);
-            this.updateSpeechInputUI('idle');
+            this.updateStatus('Error', 'error');
         }
     }
 
-    /**
-     * Send message to backend API
-     */
-    async sendMessage(message) {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                message: message,
-                conversationId: this.conversationId
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return data.response;
-    }
-
-    /**
-     * Add message to chat interface
-     */
     addMessage(text, sender) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}-message`;
@@ -230,7 +202,7 @@ class RexBotCharacter {
         avatar.className = 'message-avatar';
         
         const icon = document.createElement('i');
-        icon.className = sender === 'user' ? 'fas fa-user' : 'fas fa-robot';
+        icon.className = sender === 'bot' ? 'fas fa-robot' : 'fas fa-user';
         avatar.appendChild(icon);
         
         const content = document.createElement('div');
@@ -242,7 +214,7 @@ class RexBotCharacter {
         
         const time = document.createElement('div');
         time.className = 'message-time';
-        time.textContent = this.getCurrentTime();
+        time.textContent = new Date().toLocaleTimeString();
         
         content.appendChild(messageText);
         content.appendChild(time);
@@ -251,249 +223,127 @@ class RexBotCharacter {
         messageDiv.appendChild(content);
         
         this.chatMessages.appendChild(messageDiv);
-        
-        // Scroll to bottom
         this.scrollToBottom();
+    }
+
+    showTypingIndicator() {
+        if (this.isTyping) return;
         
-        // Add animation delay for bot messages
-        if (sender === 'bot') {
-            messageDiv.style.animationDelay = '0.1s';
+        this.isTyping = true;
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'message bot-message typing-message';
+        typingDiv.setAttribute('role', 'article');
+        typingDiv.id = 'typingIndicator';
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-robot';
+        avatar.appendChild(icon);
+        
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        
+        const typingIndicator = document.createElement('div');
+        typingIndicator.className = 'typing-indicator';
+        typingIndicator.innerHTML = `
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        `;
+        
+        content.appendChild(typingIndicator);
+        typingDiv.appendChild(avatar);
+        typingDiv.appendChild(content);
+        
+        this.chatMessages.appendChild(typingDiv);
+        this.scrollToBottom();
+    }
+
+    hideTypingIndicator() {
+        this.isTyping = false;
+        const typingIndicator = document.getElementById('typingIndicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
         }
     }
 
-    /**
-     * Speak text using speech synthesis
-     */
-    speak(text) {
-        if (!this.speechSynthesis || !this.speechEnabled) return;
+    toggleSpeech() {
+        this.isSpeechEnabled = !this.isSpeechEnabled;
         
-        // Stop any current speech
-        if (this.currentUtterance) {
-            this.speechSynthesis.cancel();
-        }
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Configure voice settings for RexBot character
-        utterance.rate = 0.9; // Slightly slower than default
-        utterance.pitch = 1.2; // Slightly higher pitch for robot-like voice
-        utterance.volume = 0.9; // High volume
-        
-        // Get available voices
-        const voices = this.speechSynthesis.getVoices();
-        let preferredVoice = voices.find(voice => 
-            voice.lang.startsWith('en') && 
-            (voice.name.includes('Male') || voice.name.includes('David') || voice.name.includes('James'))
-        );
-        
-        if (preferredVoice) {
-            utterance.voice = preferredVoice;
-        }
-        
-        // Store current utterance
-        this.currentUtterance = utterance;
-        
-        // Speak the text
-        this.speechSynthesis.speak(utterance);
-        
-        // Update UI to show speaking state
-        this.updateSpeechUI(true);
-        
-        // Reset UI when speech ends
-        utterance.onend = () => {
-            this.updateSpeechUI(false);
-            this.currentUtterance = null;
-        };
-        
-        utterance.onerror = (event) => {
-            console.error('Speech synthesis error:', event);
-            this.updateSpeechUI(false);
-            this.currentUtterance = null;
-        };
-    }
-
-    /**
-     * Toggle speech synthesis on/off
-     */
-    toggleSpeechOutput() {
-        this.speechEnabled = !this.speechEnabled;
-        this.updateSpeechUI();
-        
-        if (!this.speechEnabled && this.currentUtterance) {
-            this.speechSynthesis.cancel();
-            this.currentUtterance = null;
-        }
-    }
-
-    /**
-     * Update speech input UI
-     */
-    updateSpeechInputUI(state) {
-        const button = this.speechInputButton;
-        const icon = this.micIcon;
-        const status = this.speechStatusDisplay;
-        
-        // Remove all state classes
-        button.classList.remove('listening', 'processing');
-        status.classList.remove('listening', 'processing');
-        
-        switch (state) {
-            case 'listening':
-                button.classList.add('listening');
-                status.classList.add('listening');
-                icon.className = 'fas fa-stop';
-                status.textContent = 'Listening... Speak now!';
-                break;
-            case 'processing':
-                button.classList.add('processing');
-                status.classList.add('processing');
-                icon.className = 'fas fa-spinner fa-spin';
-                status.textContent = 'Processing your message...';
-                break;
-            case 'error':
-                icon.className = 'fas fa-exclamation-triangle';
-                status.textContent = 'Error occurred. Try again!';
-                break;
-            default: // idle
-                icon.className = 'fas fa-microphone';
-                status.textContent = 'Click the microphone to speak';
-                break;
-        }
-    }
-
-    /**
-     * Update speech output UI elements
-     */
-    updateSpeechUI(isSpeaking = false) {
-        if (this.speechEnabled) {
-            this.speechIcon.className = isSpeaking ? 'fas fa-volume-mute' : 'fas fa-volume-up';
-            this.speechStatus.textContent = isSpeaking ? 'RexBot speaking...' : 'RexBot voice enabled';
-            this.speechToggle.classList.toggle('active', isSpeaking);
+        if (this.isSpeechEnabled) {
+            this.speechIcon.className = 'fas fa-volume-up';
+            this.speechStatus.textContent = 'RexBot voice enabled';
+            this.speechToggle.classList.remove('disabled');
         } else {
             this.speechIcon.className = 'fas fa-volume-mute';
             this.speechStatus.textContent = 'RexBot voice disabled';
-            this.speechToggle.classList.remove('active');
+            this.speechToggle.classList.add('disabled');
         }
     }
 
-    /**
-     * Set up the voice for speech synthesis
-     */
-    setupVoice() {
-        const voices = this.speechSynthesis.getVoices();
-        
-        // Try to find a male voice that sounds robotic
-        let preferredVoice = voices.find(voice => 
-            voice.lang.startsWith('en') && 
-            (voice.name.includes('Male') || voice.name.includes('David') || voice.name.includes('James'))
-        );
-        
-        if (!preferredVoice) {
-            preferredVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
-        }
-        
-        if (preferredVoice) {
-            console.log('Using voice:', preferredVoice.name);
-        }
-    }
-
-    /**
-     * Handle keyboard shortcuts
-     */
-    handleKeyboard(e) {
-        // Spacebar to toggle speech input
-        if (e.code === 'Space' && !this.isProcessing) {
-            e.preventDefault();
-            this.toggleSpeechInput();
-        }
-        
-        // Escape to close modal
-        if (e.key === 'Escape' && this.errorModal.classList.contains('show')) {
-            this.hideErrorModal();
+    speak(text) {
+        if (this.speechSynthesis && this.isSpeechEnabled) {
+            // Stop any current speech
+            this.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.9;
+            utterance.pitch = 1.1;
+            utterance.volume = 0.8;
+            
+            // Try to use a more natural voice
+            const voices = this.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(voice => 
+                voice.name.includes('Google') || 
+                voice.name.includes('Natural') ||
+                voice.name.includes('Premium')
+            );
+            
+            if (preferredVoice) {
+                utterance.voice = preferredVoice;
+            }
+            
+            this.speechSynthesis.speak(utterance);
         }
     }
 
-    /**
-     * Set loading state
-     */
-    setLoading(loading) {
-        this.isProcessing = loading;
-        this.loadingOverlay.classList.toggle('show', loading);
-        this.speechInputButton.disabled = loading;
-    }
-
-    /**
-     * Update status indicator
-     */
-    updateStatus(status) {
-        this.statusText.textContent = status;
+    updateStatus(text, status) {
+        if (this.statusText) {
+            this.statusText.textContent = text;
+        }
         
-        // Update status dot color
-        this.statusDot.className = 'status-dot';
-        switch (status.toLowerCase()) {
-            case 'ready':
-                this.statusDot.style.background = '#10b981';
-                break;
-            case 'listening...':
-                this.statusDot.style.background = '#ef4444';
-                break;
-            case 'processing...':
-                this.statusDot.style.background = '#f59e0b';
-                break;
-            case 'error':
-                this.statusDot.style.background = '#ef4444';
-                break;
+        if (this.statusDot) {
+            this.statusDot.className = `status-dot ${status}`;
         }
     }
 
-    /**
-     * Show error modal
-     */
     showError(message) {
-        this.errorMessage.textContent = message;
-        this.errorModal.classList.add('show');
-        this.errorModal.setAttribute('aria-hidden', 'false');
+        if (this.errorModal && this.errorMessage) {
+            this.errorMessage.textContent = message;
+            this.errorModal.style.display = 'flex';
+        } else {
+            alert(message);
+        }
     }
 
-    /**
-     * Hide error modal
-     */
-    hideErrorModal() {
-        this.errorModal.classList.remove('show');
-        this.errorModal.setAttribute('aria-hidden', 'true');
+    closeErrorModal() {
+        if (this.errorModal) {
+            this.errorModal.style.display = 'none';
+        }
     }
 
-    /**
-     * Scroll chat to bottom
-     */
     scrollToBottom() {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
 
-    /**
-     * Get current time formatted
-     */
-    getCurrentTime() {
-        return new Date().toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        });
-    }
-
-    /**
-     * Set welcome message time
-     */
     setWelcomeTime() {
         const welcomeTime = document.getElementById('welcomeTime');
         if (welcomeTime) {
-            welcomeTime.textContent = this.getCurrentTime();
+            welcomeTime.textContent = new Date().toLocaleTimeString();
         }
     }
 
-    /**
-     * Generate unique conversation ID
-     */
     generateConversationId() {
         return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
@@ -501,32 +351,5 @@ class RexBotCharacter {
 
 // Initialize RexBot when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        window.rexbot = new RexBotCharacter();
-        console.log('🚀 RexBot AI Character initialized successfully');
-    } catch (error) {
-        console.error('Failed to initialize RexBot:', error);
-        // Show error to user
-        setTimeout(() => {
-            if (window.rexbot) {
-                window.rexbot.showError('Failed to initialize RexBot. Please refresh the page.');
-            }
-        }, 1000);
-    }
-});
-
-// Handle page visibility changes to pause speech when tab is hidden
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden && window.rexbot && window.rexbot.speechSynthesis) {
-        window.rexbot.speechSynthesis.pause();
-    } else if (!document.hidden && window.rexbot && window.rexbot.speechSynthesis) {
-        window.rexbot.speechSynthesis.resume();
-    }
-});
-
-// Handle beforeunload to clean up speech synthesis
-window.addEventListener('beforeunload', () => {
-    if (window.rexbot && window.rexbot.speechSynthesis) {
-        window.rexbot.speechSynthesis.cancel();
-    }
+    new RexBot();
 });
