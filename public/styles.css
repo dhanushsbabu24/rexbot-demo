@@ -533,6 +533,108 @@ body {
     }
 }
 
+/* Conversation Form */
+.conversation-form-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.conversation-form {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+}
+
+.conversation-form h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.conversation-form p {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 30px;
+}
+
+.conversation-form .form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.conversation-form label {
+    display: block;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.conversation-form input,
+.conversation-form select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+}
+
+.conversation-form input:focus,
+.conversation-form select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.conversation-form .form-actions {
+    margin-top: 30px;
+}
+
+.conversation-form .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.conversation-form .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+/* System Messages */
+.system-message .message-avatar {
+    background: #17a2b8;
+}
+
+.system-message .message-text {
+    color: #17a2b8;
+    font-style: italic;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
@@ -625,4 +727,93 @@ body {
     .status-dot {
         border: 2px solid #000;
     }
+}
+
+/* Conversation Form */
+.conversation-form-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.conversation-form {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px;
+    margin: 20px;
+}
+
+.conversation-form h2 {
+    text-align: center;
+    margin-bottom: 10px;
+    color: #333;
+    font-size: 24px;
+}
+
+.conversation-form p {
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.conversation-form .form-group {
+    margin-bottom: 20px;
+}
+
+.conversation-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.conversation-form input,
+.conversation-form select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e1e5e9;
+    border-radius: 10px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.conversation-form input:focus,
+.conversation-form select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.conversation-form .form-actions {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.conversation-form .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.conversation-form .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
 }

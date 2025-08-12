@@ -16,11 +16,17 @@
                 <div class="logo">
                     <i class="fas fa-robot"></i>
                     <h1>RexBot</h1>
-                    <span class="subtitle">AI Character</span>
+                    <span class="subtitle">AI Receptionist</span>
                 </div>
-                <div class="status-indicator">
-                    <div class="status-dot" id="statusDot"></div>
-                    <span id="statusText">Ready</span>
+                <div class="header-actions">
+                    <a href="/staff" class="staff-link">
+                        <i class="fas fa-user-tie"></i>
+                        Staff Login
+                    </a>
+                    <div class="status-indicator">
+                        <div class="status-dot" id="statusDot"></div>
+                        <span id="statusText">Ready</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -87,6 +93,7 @@
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo   Alexa AI Receptionist Chatbot
+echo   RexBot AI Reception System
 echo ========================================
 echo.
 echo Starting the server...
@@ -30,6 +30,9 @@ REM Create .env file if it doesn't exist
 if not exist ".env" (
     echo Creating .env file from template...
     copy env.example .env >nul
+    echo.
+    echo IMPORTANT: Please edit .env file and add your Gemini API key
+    echo.
 )
 
 echo Starting server on http://localhost:3000

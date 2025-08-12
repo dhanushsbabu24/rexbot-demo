@@ -1,19 +1,23 @@
 /**
- * Enhanced RexBot AI Character - Main Script
+ * RexBot AI Reception System - Client Script
  */
 
 class RexBot {
     constructor() {
-        this.conversationId = this.generateConversationId();
+        this.socket = io();
+        this.conversationId = null;
+        this.sessionId = null;
         this.speechRecognition = null;
         this.speechSynthesis = window.speechSynthesis;
         this.isListening = false;
         this.isSpeechEnabled = true;
         this.isTyping = false;
+        this.isConversationStarted = false;
         
         this.initializeElements();
         this.initializeSpeechRecognition();
         this.setupEventListeners();
+        this.setupSocketListeners();
         this.setWelcomeTime();
         this.setupKeyboardShortcuts();
     }
@@ -80,6 +84,11 @@ class RexBot {
     setupEventListeners() {
         // Speech input button
         this.speechInputButton.addEventListener('click', () => {
+            if (!this.isConversationStarted) {
+                this.startConversation();
+                return;
+            }
+            
             if (this.isListening) {
                 this.speechRecognition.stop();
             } else {
@@ -107,11 +116,79 @@ class RexBot {
         });
     }
 
+    setupSocketListeners() {
+        // Connection events
+        this.socket.on('connect', () => {
+            console.log('Connected to server');
+            this.updateStatus('Connected', 'ready');
+        });
+
+        this.socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            this.updateStatus('Disconnected', 'error');
+        });
+
+        // Conversation events
+        this.socket.on('conversation-started', (data) => {
+            console.log('Conversation started:', data);
+            this.sessionId = data.sessionId;
+            this.conversationId = data.callId;
+            this.isConversationStarted = true;
+            this.updateStatus('Ready to chat', 'ready');
+            this.speechStatusDisplay.textContent = 'Click the microphone to speak';
+            
+            // Store user data for welcome message
+            this.userData = data;
+            
+            // Add welcome message
+            this.addMessage(`Welcome! I'm RexBot, your AI receptionist. I understand you're here for: ${data.purpose}. How can I assist you today?`, 'bot');
+        });
+
+        this.socket.on('ai-response', (data) => {
+            this.hideTypingIndicator();
+            this.addMessage(data.response, 'bot');
+            
+            if (this.isSpeechEnabled) {
+                this.speak(data.response);
+            }
+            
+            this.updateStatus('Ready', 'ready');
+        });
+
+        this.socket.on('call-accepted', (data) => {
+            this.addMessage(`Your call has been accepted by ${data.staffName} from ${data.staffDepartment}. You will be connected shortly.`, 'system');
+        });
+
+        this.socket.on('call-completed', (data) => {
+            const decision = data.decision === 'accepted' ? 'accepted' : 'declined';
+            this.addMessage(`Your meeting request has been ${decision}. ${data.notes ? 'Notes: ' + data.notes : ''}`, 'system');
+        });
+
+        // Error handling
+        this.socket.on('error', (data) => {
+            console.error('Socket error:', data);
+            this.showError(data.message || 'An error occurred');
+            this.updateStatus('Error', 'error');
+        });
+        
+        // Connection error handling
+        this.socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+            this.showError('Failed to connect to server. Please check your internet connection.');
+            this.updateStatus('Connection Error', 'error');
+        });
+    }
+
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
             // Spacebar to toggle speech input
             if (e.code === 'Space' && !e.target.matches('input, textarea')) {
                 e.preventDefault();
+                if (!this.isConversationStarted) {
+                    this.startConversation();
+                    return;
+                }
+                
                 if (this.speechRecognition) {
                     if (this.isListening) {
                         this.speechRecognition.stop();
@@ -123,8 +200,107 @@ class RexBot {
         });
     }
 
+    startConversation() {
+        // Show conversation start form
+        this.showConversationForm();
+    }
+
+    showConversationForm() {
+        const formHTML = `
+            <div class="conversation-form-overlay">
+                <div class="conversation-form">
+                    <h2>Start Your Conversation</h2>
+                    <p>Please provide your information to begin chatting with RexBot</p>
+                    
+                    <form id="conversationForm">
+                        <div class="form-group">
+                            <label for="userName">Your Name</label>
+                            <input type="text" id="userName" name="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="userEmail">Email Address</label>
+                            <input type="email" id="userEmail" name="email" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="purpose">Purpose of Visit</label>
+                            <select id="purpose" name="purpose" required>
+                                <option value="">Select a purpose</option>
+                                <option value="General Inquiry">General Inquiry</option>
+                                <option value="Appointment Booking">Appointment Booking</option>
+                                <option value="Support Request">Support Request</option>
+                                <option value="Sales Inquiry">Sales Inquiry</option>
+                                <option value="Feedback">Feedback</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-play"></i>
+                                Start Conversation
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', formHTML);
+        
+        const form = document.getElementById('conversationForm');
+        form.addEventListener('submit', (e) => this.handleConversationSubmit(e));
+    }
+
+    handleConversationSubmit(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const data = {
+            name: formData.get('name'),
+            email: formData.get('email'),
+            purpose: formData.get('purpose')
+        };
+        
+        // Validate form data
+        if (!data.name || !data.email || !data.purpose) {
+            this.showError('Please fill in all fields');
+            return;
+        }
+        
+        // Remove the form
+        const overlay = document.querySelector('.conversation-form-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
+        
+        // Update UI
+        this.updateStatus('Starting conversation...', 'processing');
+        this.speechStatusDisplay.textContent = 'Setting up your conversation...';
+        
+        // Start conversation with server
+        try {
+            this.socket.emit('start-conversation', data);
+            console.log('Emitting start-conversation with data:', data);
+            
+            // Set a timeout for conversation start
+            setTimeout(() => {
+                if (!this.isConversationStarted) {
+                    this.showError('Failed to start conversation. Please check your connection and try again.');
+                    this.updateStatus('Error', 'error');
+                }
+            }, 10000); // 10 second timeout
+            
+        } catch (error) {
+            console.error('Error starting conversation:', error);
+            this.showError('Failed to start conversation. Please try again.');
+            this.updateStatus('Error', 'error');
+        }
+    }
+
     startSpeechRecognition() {
-        if (this.speechRecognition) {
+        if (this.speechRecognition && this.isConversationStarted) {
             this.speechRecognition.start();
         }
     }
@@ -133,13 +309,13 @@ class RexBot {
         this.isListening = false;
         this.speechInputButton.classList.remove('recording');
         this.micIcon.className = 'fas fa-microphone';
-        this.speechStatusDisplay.textContent = 'Click the microphone to speak';
+        this.speechStatusDisplay.textContent = this.isConversationStarted ? 'Click the microphone to speak' : 'Click to start conversation';
         this.speechStatusDisplay.classList.remove('listening');
         this.updateStatus('Ready', 'ready');
     }
 
-    async sendMessage(message) {
-        if (!message.trim()) return;
+    sendMessage(message) {
+        if (!message.trim() || !this.isConversationStarted) return;
         
         // Add user message to chat
         this.addMessage(message, 'user');
@@ -150,47 +326,11 @@ class RexBot {
         // Update status
         this.updateStatus('Processing...', 'processing');
         
-        try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: message,
-                    conversationId: this.conversationId
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            
-            // Hide typing indicator
-            this.hideTypingIndicator();
-            
-            // Add bot response to chat
-            this.addMessage(data.response, 'bot');
-            
-            // Speak the response if enabled
-            if (this.isSpeechEnabled) {
-                this.speak(data.response);
-            }
-            
-            this.updateStatus('Ready', 'ready');
-            
-        } catch (error) {
-            console.error('Error sending message:', error);
-            this.hideTypingIndicator();
-            this.showError('Failed to send message. Please try again.');
-            this.updateStatus('Error', 'error');
-        }
+        // Send message via Socket.IO
+        this.socket.emit('chat-message', {
+            sessionId: this.sessionId,
+            message: message
+        });
     }
 
     addMessage(text, sender) {
@@ -202,7 +342,13 @@ class RexBot {
         avatar.className = 'message-avatar';
         
         const icon = document.createElement('i');
-        icon.className = sender === 'bot' ? 'fas fa-robot' : 'fas fa-user';
+        if (sender === 'bot') {
+            icon.className = 'fas fa-robot';
+        } else if (sender === 'user') {
+            icon.className = 'fas fa-user';
+        } else if (sender === 'system') {
+            icon.className = 'fas fa-info-circle';
+        }
         avatar.appendChild(icon);
         
         const content = document.createElement('div');
@@ -342,10 +488,6 @@ class RexBot {
         if (welcomeTime) {
             welcomeTime.textContent = new Date().toLocaleTimeString();
         }
-    }
-
-    generateConversationId() {
-        return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 }
 

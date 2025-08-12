@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RexBot Staff Dashboard</title>
+    <link rel="stylesheet" href="staff-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="staff-container">
+        <!-- Login Section -->
+        <div id="loginSection" class="login-section">
+            <div class="login-card">
+                <div class="login-header">
+                    <i class="fas fa-user-tie"></i>
+                    <h1>Staff Login</h1>
+                    <p>Access the reception management system</p>
+                </div>
+                <form id="loginForm" class="login-form">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Login
+                    </button>
+                </form>
+                <div id="loginError" class="error-message" style="display: none;"></div>
+                
+                <div class="register-link">
+                    <p>Don't have an account? <a href="/register">Register here</a></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboardSection" class="dashboard-section" style="display: none;">
+            <!-- Header -->
+            <header class="dashboard-header">
+                <div class="header-left">
+                    <h1><i class="fas fa-headset"></i> Reception Dashboard</h1>
+                    <span class="staff-info" id="staffInfo"></span>
+                </div>
+                <div class="header-right">
+                    <div class="status-indicator">
+                        <div class="status-dot online"></div>
+                        <span>Online</span>
+                    </div>
+                    <button id="logoutBtn" class="btn btn-secondary">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </button>
+                </div>
+            </header>
+
+            <div class="dashboard-content">
+                <!-- Left Panel - Call Queue -->
+                <div class="left-panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-phone"></i> Call Queue</h2>
+                        <span class="badge" id="waitingCount">0</span>
+                    </div>
+                    <div class="call-queue" id="callQueue">
+                        <div class="empty-state">
+                            <i class="fas fa-phone-slash"></i>
+                            <p>No waiting calls</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center Panel - Video Call -->
+                <div class="center-panel">
+                    <div class="video-container" id="videoContainer">
+                        <div class="video-placeholder">
+                            <i class="fas fa-video"></i>
+                            <h3>No Active Call</h3>
+                            <p>Accept a call from the queue to start video communication</p>
+                        </div>
+                        <video id="localVideo" autoplay muted playsinline style="display: none;"></video>
+                        <video id="remoteVideo" autoplay playsinline style="display: none;"></video>
+                    </div>
+                    
+                    <!-- Call Controls -->
+                    <div class="call-controls" id="callControls" style="display: none;">
+                        <button id="muteBtn" class="control-btn">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                        <button id="videoBtn" class="control-btn">
+                            <i class="fas fa-video"></i>
+                        </button>
+                        <button id="endCallBtn" class="control-btn danger">
+                            <i class="fas fa-phone-slash"></i>
+                        </button>
+                    </div>
+
+                    <!-- Call Decision -->
+                    <div class="call-decision" id="callDecision" style="display: none;">
+                        <h3>Call Decision</h3>
+                        <div class="decision-buttons">
+                            <button id="acceptBtn" class="btn btn-success">
+                                <i class="fas fa-check"></i>
+                                Accept Meeting
+                            </button>
+                            <button id="rejectBtn" class="btn btn-danger">
+                                <i class="fas fa-times"></i>
+                                Decline
+                            </button>
+                        </div>
+                        <div class="notes-section">
+                            <label for="callNotes">Notes:</label>
+                            <textarea id="callNotes" placeholder="Add notes about the call..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel - Call History -->
+                <div class="right-panel">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-history"></i> Call History</h2>
+                    </div>
+                    <div class="call-history" id="callHistory">
+                        <div class="empty-state">
+                            <i class="fas fa-clock"></i>
+                            <p>No call history</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="staff-script.js"></script>
+</body>
+</html>
