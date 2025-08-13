@@ -85,11 +85,14 @@ Always respond as RexBot, maintaining your professional receptionist personality
 /**
  * Generate chatbot response using Gemini AI API
  */
-async function generateResponse(message, conversationId) {
+async function generateResponse(message, conversationId, historyMessages = []) {
   try {
-    // Get conversation history from database
-    const conversation = await Conversation.findOne({ sessionId: conversationId });
-    const messages = conversation ? conversation.messages.slice(-10) : [];
+    // Use provided history or attempt DB only when connected
+    let messages = Array.isArray(historyMessages) ? historyMessages.slice(-10) : [];
+    if (messages.length === 0 && mongoose.connection.readyState === 1) {
+      const conversation = await Conversation.findOne({ sessionId: conversationId });
+      messages = conversation ? conversation.messages.slice(-10) : [];
+    }
 
     // Gemini AI API endpoint and key
     const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent';
@@ -133,7 +136,7 @@ async function generateResponse(message, conversationId) {
       }
     });
 
-    return response.data.candidates[0].content.parts[0].text;
+    return response.data.candidates?.[0]?.content?.parts?.[0]?.text || 'I am here to help. Could you please rephrase that?';
   } catch (error) {
     console.error('Error generating response:', error);
     if (error.response) {
@@ -408,28 +411,58 @@ io.on('connection', (socket) => {
       
       if (!user) return;
 
-      // Save user message
-      const conversation = await Conversation.findOne({ sessionId });
-      if (conversation) {
-        conversation.messages.push({
-          sender: 'user',
-          content: message,
-          messageType: 'text'
-        });
-        await conversation.save();
+      let historyMessages = [];
+
+      if (mongoose.connection.readyState === 1) {
+        // Persist to MongoDB
+        const conversation = await Conversation.findOne({ sessionId });
+        if (conversation) {
+          conversation.messages.push({
+            sender: 'user',
+            content: message,
+            messageType: 'text'
+          });
+          await conversation.save();
+          historyMessages = conversation.messages;
+        }
+      } else {
+        // Demo mode: use in-memory store
+        const demoConversation = demoConversations.get(sessionId);
+        if (demoConversation) {
+          demoConversation.messages.push({
+            sender: 'user',
+            content: message,
+            messageType: 'text'
+          });
+          historyMessages = demoConversation.messages;
+        } else {
+          historyMessages = [];
+        }
       }
 
       // Generate AI response
-      const aiResponse = await generateResponse(message, sessionId);
+      const aiResponse = await generateResponse(message, sessionId, historyMessages);
       
       // Save AI response
-      if (conversation) {
-        conversation.messages.push({
-          sender: 'rexbot',
-          content: aiResponse,
-          messageType: 'text'
-        });
-        await conversation.save();
+      if (mongoose.connection.readyState === 1) {
+        const conversation = await Conversation.findOne({ sessionId });
+        if (conversation) {
+          conversation.messages.push({
+            sender: 'rexbot',
+            content: aiResponse,
+            messageType: 'text'
+          });
+          await conversation.save();
+        }
+      } else {
+        const demoConversation = demoConversations.get(sessionId);
+        if (demoConversation) {
+          demoConversation.messages.push({
+            sender: 'rexbot',
+            content: aiResponse,
+            messageType: 'text'
+          });
+        }
       }
 
       socket.emit('ai-response', { response: aiResponse });
